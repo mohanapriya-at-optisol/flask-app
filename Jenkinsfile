@@ -2,12 +2,19 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION  = "ap-south-1"
-        INSTANCE_ID = "i-0876c80ca0a7a4ff0"
-        IMAGE_NAME  = "priyaobs/flask-demo:latest"
+        AWS_REGION   = "ap-south-1"
+        INSTANCE_ID  = "i-0876c80ca0a7a4ff0"
+        IMAGE_NAME   = "priyaobs/flask-demo:latest"
+        TARGET_ROLE_ARN = credentials('target-role-arn')
     }
 
     stages {
+
+        stage('Checkout Source') {
+            steps {
+                checkout scm
+            }
+        }
 
         stage('Build Docker Image') {
             steps {
@@ -33,19 +40,28 @@ pipeline {
             }
         }
 
-        stage('Deploy to EC2 via SSM') {
+        stage('Deploy to EC2 via SSM (Cross Account)') {
             steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-ssm-creds'
-                ]]) {
+                sh '''
+set +x
 
-                    sh '''
+# Assume target account role
+read AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN <<< $(aws sts assume-role \
+  --role-arn ${TARGET_ROLE_ARN} \
+  --role-session-name jenkins-ssm \
+  --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
+  --output text)
+
+export AWS_ACCESS_KEY_ID
+export AWS_SECRET_ACCESS_KEY
+export AWS_SESSION_TOKEN
+
+# Deploy using SSM
 aws ssm send-command \
   --region ${AWS_REGION} \
   --instance-ids ${INSTANCE_ID} \
-  --document-name "AWS-RunShellScript" \
-  --comment "Deploy Flask app from Docker Hub" \
+  --document-name AWS-RunShellScript \
+  --comment "Deploy Flask Docker App from Jenkins" \
   --parameters commands="[
     'docker pull ${IMAGE_NAME}',
     'docker stop flask-demo || true',
@@ -53,8 +69,16 @@ aws ssm send-command \
     'docker run -d --name flask-demo -p 5000:5000 ${IMAGE_NAME}'
   ]"
 '''
-                }
             }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ Deployment completed successfully"
+        }
+        failure {
+            echo "❌ Deployment failed"
         }
     }
 }
