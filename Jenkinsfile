@@ -35,25 +35,19 @@ pipeline {
 
         stage('Deploy to EC2 via SSM') {
             steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-ssm-creds'
-                ]]) {
-
-                    sh '''
+                sh '''
 aws ssm send-command \
   --region ${AWS_REGION} \
   --instance-ids ${INSTANCE_ID} \
   --document-name "AWS-RunShellScript" \
   --comment "Deploy Flask app from Docker Hub" \
   --parameters commands="[
-    'docker pull ${IMAGE_NAME}',
-    'docker stop flask-demo || true',
-    'docker rm flask-demo || true',
-    'docker run -d --name flask-demo -p 5000:5000 ${IMAGE_NAME}'
+    'sudo docker pull ${IMAGE_NAME}',
+    'sudo docker stop flask-demo || true',
+    'sudo docker rm flask-demo || true',
+    'sudo docker run -d --name flask-demo -p 5000:5000 ${IMAGE_NAME}'
   ]"
 '''
-                }
             }
         }
     }
