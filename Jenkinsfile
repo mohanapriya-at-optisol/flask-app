@@ -2,9 +2,9 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION   = "ap-south-1"
-        INSTANCE_ID  = "i-0876c80ca0a7a4ff0"
-        IMAGE_NAME   = "priyaobs/flask-demo:latest"
+        AWS_REGION  = "ap-south-1"
+        INSTANCE_ID = "i-0876c80ca0a7a4ff0"
+        IMAGE_NAME  = "priyaobs/flask-demo:latest"
         TARGET_ROLE_ARN = credentials('target-role-arn')
     }
 
@@ -39,18 +39,16 @@ pipeline {
                 sh '''
 set +x
 
-# Assume target account role
-read AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN <<< $(aws sts assume-role \
+CREDS=$(aws sts assume-role \
   --role-arn ${TARGET_ROLE_ARN} \
   --role-session-name jenkins-ssm \
   --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
   --output text)
 
-export AWS_ACCESS_KEY_ID
-export AWS_SECRET_ACCESS_KEY
-export AWS_SESSION_TOKEN
+export AWS_ACCESS_KEY_ID=$(echo $CREDS | awk '{print $1}')
+export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | awk '{print $2}')
+export AWS_SESSION_TOKEN=$(echo $CREDS | awk '{print $3}')
 
-# Deploy using SSM
 aws ssm send-command \
   --region ${AWS_REGION} \
   --instance-ids ${INSTANCE_ID} \
