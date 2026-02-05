@@ -12,7 +12,7 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 sh '''
-                  docker build -t ${IMAGE_NAME} .
+                  sudo docker build -t ${IMAGE_NAME} .
                 '''
             }
         }
@@ -25,9 +25,9 @@ pipeline {
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
                     sh '''
-                      echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                      docker push ${IMAGE_NAME}
-                      docker logout
+                      echo "$DOCKER_PASS" | sudo docker login -u "$DOCKER_USER" --password-stdin
+                      sudo docker push ${IMAGE_NAME}
+                      sudo docker logout
                     '''
                 }
             }
@@ -47,10 +47,10 @@ aws ssm send-command \
   --document-name "AWS-RunShellScript" \
   --comment "Deploy Flask app from Docker Hub" \
   --parameters commands="[
-    'docker pull ${IMAGE_NAME}',
-    'docker stop flask-demo || true',
-    'docker rm flask-demo || true',
-    'docker run -d --name flask-demo -p 5000:5000 ${IMAGE_NAME}'
+    'sudo docker pull ${IMAGE_NAME}',
+    'sudo docker stop flask-demo || true',
+    'sudo docker rm flask-demo || true',
+    'sudo docker run -d --name flask-demo -p 5000:5000 ${IMAGE_NAME}'
   ]"
 '''
                 }
